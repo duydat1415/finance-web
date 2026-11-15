@@ -9,14 +9,6 @@ streamlit run app.py
 ```
 Tài khoản demo: `demo@example.com` / `demo1234`.
 
-## Trợ lý AI (Groq)
-Đặt khóa vào secrets, **không** ghi vào mã nguồn:
-- Streamlit Cloud: app > Settings > Secrets, dán `GROQ_API_KEY = "gsk_..."`.
-- Máy cá nhân: tạo `.streamlit/secrets.toml` (đã có trong `.gitignore`) với cùng nội dung.
-
-Tùy chọn: `GROQ_MODEL = "..."` để đổi mô hình (mặc định `llama-3.3-70b-versatile`).
-Không có khóa hoặc gọi lỗi thì trợ lý dùng trả lời theo quy tắc.
-
 ## Cấu trúc
 - `app.py`: điểm vào, bảo vệ đăng nhập và menu điều hướng.
 - `ui.py`: theme CSS, header trang, biểu đồ tròn.
@@ -28,6 +20,13 @@ Không có khóa hoặc gọi lỗi thì trợ lý dùng trả lời theo quy t�
 - Thêm đăng nhập bắt buộc trước khi vào app, nút đăng xuất.
 - Sửa lỗi: chuyển giữa các ví bị tính như thu/chi trong Tổng quan, Giao dịch, Ngân sách, Báo cáo, Trợ lý AI.
 - Thêm nút tải CSV thật ở trang Tài khoản & tiện ích.
+
+## Trợ lý AI
+Dùng Groq (miễn phí). Đặt khóa trong `.streamlit/secrets.toml` (local) hoặc Settings → Secrets (Streamlit Cloud):
+```toml
+GROQ_API_KEY = "gsk_..."
+```
+Không có khóa thì trợ lý dùng quy tắc mẫu. Chỉ gửi tổng hợp số dư và chi tiêu, không gửi tên giao dịch.
 
 ## Chưa làm
 - Liên kết ngân hàng, đăng nhập Google.

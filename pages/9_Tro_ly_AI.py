@@ -1,74 +1,54 @@
-"""Trợ lý tài chính AI: gọi Groq nếu có GROQ_API_KEY, nếu không thì trả lời theo quy tắc.
+"""Trợ lý tài chính AI: dùng API của Groq (miễn phí), có dự phòng bằng quy tắc khi không có khóa hoặc lỗi.
 
-Khóa đọc từ st.secrets (Streamlit Cloud: Settings > Secrets; máy cá nhân: .streamlit/secrets.toml)
-hoặc biến môi trường. Không ghi khóa vào mã nguồn: repo đang public.
+Dữ liệu gửi tới API chỉ là tổng hợp (số dư, chi theo danh mục, hạn mức). Không gửi tên giao dịch.
+Khóa API đặt trong Streamlit Secrets (GROQ_API_KEY) hoặc biến môi trường, không ghi vào mã nguồn.
 """
 
-import json
 import os
-import urllib.error
-import urllib.request
 
 import streamlit as st
+from openai import OpenAI
 
 from data import BUDGETS, fmt_vnd, get_transactions, real_flows, wallet_balances
+from ui import page_header
+
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
+SYSTEM_PROMPT = (
+    "Bạn là trợ lý tài chính cá nhân trong ứng dụng Máy / Tài chính. Luôn trả lời bằng tiếng Việt, ngắn gọn. "
+    "Chỉ dựa trên phần DỮ LIỆU bên dưới; nếu thiếu dữ liệu, nói rõ, không bịa số liệu. "
+    "Không đưa khuyến nghị đầu tư cụ thể (mua bán cổ phiếu, tiền mã hóa). "
+    "Với vấn đề pháp lý hoặc thuế, khuyên người dùng hỏi chuyên gia."
+)
 
 
-st.title("Trợ lý tài chính AI")
-st.caption("Hỏi về số dư, chi tiêu và ngân sách của bạn")
-
-
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-
-
-def _secret(name: str, default: str | None = None) -> str | None:
+def get_api_key():
     try:
-        if name in st.secrets:
-            return st.secrets[name]
-    except Exception:  # không có file secrets
-        pass
-    return os.environ.get(name, default)
+        key = st.secrets.get("GROQ_API_KEY")
+    except Exception:
+        key = None
+    return key or os.environ.get("GROQ_API_KEY")
 
 
-def finance_context() -> str:
-    """Tóm tắt dữ liệu trong app để mô hình trả lời đúng số liệu của người dùng."""
+def build_summary() -> str:
+    """Tổng hợp tài chính, không có tên giao dịch chi tiết."""
     df = real_flows(get_transactions())
     balances = wallet_balances()
-    spend = df[df["Số tiền"] < 0].assign(Chi=lambda d: -d["Số tiền"]).groupby("Danh mục")["Chi"].sum()
-    income = df[df["Số tiền"] > 0]["Số tiền"].sum()
-    lines = [f"Tổng số dư: {fmt_vnd(sum(balances.values()))}"]
-    lines += [f"Ví {w}: {fmt_vnd(a)}" for w, a in balances.items()]
-    lines.append(f"Tổng thu: {fmt_vnd(income)}; tổng chi: {fmt_vnd(spend.sum())}")
-    for c, v in spend.sort_values(ascending=False).items():
-        limit = BUDGETS.get(c)
-        extra = f" / ngân sách {fmt_vnd(limit)}" + (" (VƯỢT)" if v > limit else "") if limit else ""
-        lines.append(f"Chi {c}: {fmt_vnd(v)}{extra}")
+    spend = (
+        df[df["Số tiền"] < 0].assign(Chi=lambda d: -d["Số tiền"]).groupby("Danh mục")["Chi"].sum()
+    )
+    lines = ["Số dư theo ví:"]
+    lines += [f"- {w}: {fmt_vnd(a)}" for w, a in balances.items()]
+    lines.append(f"Tổng số dư: {fmt_vnd(sum(balances.values()))}")
+    lines.append("Chi tiêu tháng 9/2026 so với hạn mức:")
+    for cat, limit in BUDGETS.items():
+        lines.append(f"- {cat}: đã chi {fmt_vnd(float(spend.get(cat, 0)))} / hạn mức {fmt_vnd(limit)}")
     return "\n".join(lines)
 
 
-def groq_answer(history: list[dict], key: str) -> str:
-    system = (
-        "Bạn là trợ lý tài chính cá nhân, trả lời ngắn gọn bằng tiếng Việt. "
-        "Chỉ dùng số liệu trong dữ liệu dưới đây, không bịa số. "
-        "Nếu dữ liệu không đủ để trả lời, hãy nói rõ.\n\nDữ liệu hiện tại:\n" + finance_context()
-    )
-    body = {
-        "model": _secret("GROQ_MODEL", "llama-3.3-70b-versatile"),
-        "messages": [{"role": "system", "content": system}] + history[-10:],
-        "temperature": 0.3,
-    }
-    req = urllib.request.Request(
-        GROQ_URL,
-        data=json.dumps(body).encode("utf-8"),
-        # Cloudflare của Groq chặn User-Agent mặc định "Python-urllib" (lỗi 1010)
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
-                 "User-Agent": "finance-web/1.0"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read())["choices"][0]["message"]["content"]
-
-
 def answer(question: str) -> str:
+    """Trả lời theo quy tắc, dùng khi không có API hoặc API lỗi."""
     q = question.lower()
     df = real_flows(get_transactions())
     balances = wallet_balances()
@@ -93,6 +73,28 @@ def answer(question: str) -> str:
             "và các danh mục chi nhiều nhất. Hãy thử hỏi một trong các ý đó.")
 
 
+def ask_groq(api_key: str, history: list[dict]) -> str:
+    client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+    # Bỏ lời chào mở đầu của trợ lý (API yêu cầu tin nhắn đầu là của người dùng)
+    msgs = [m for m in history[-10:]]
+    while msgs and msgs[0]["role"] != "user":
+        msgs.pop(0)
+    messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\nDỮ LIỆU:\n" + build_summary()}]
+    messages += [{"role": m["role"], "content": m["content"]} for m in msgs]
+    resp = client.chat.completions.create(model=MODEL, messages=messages, max_tokens=800)
+    return (resp.choices[0].message.content or "").strip()
+
+
+page_header("Trợ lý tài chính AI", "Hỏi về số dư, chi tiêu và ngân sách của bạn")
+
+api_key = get_api_key()
+if api_key:
+    st.caption(
+        f"Đang dùng mô hình {MODEL} qua Groq. Chỉ tổng hợp số dư và chi tiêu được gửi tới API, không gửi tên giao dịch."
+    )
+else:
+    st.info("Chưa cấu hình GROQ_API_KEY, đang trả lời theo quy tắc mẫu.")
+
 if "chat" not in st.session_state:
     st.session_state.chat = [{"role": "assistant", "content": "Chào bạn, bạn muốn hỏi gì về tài chính của mình?"}]
 
@@ -102,19 +104,14 @@ for msg in st.session_state.chat:
 
 if prompt := st.chat_input("Ví dụ: danh mục nào vượt ngân sách?"):
     st.session_state.chat.append({"role": "user", "content": prompt})
-    key = _secret("GROQ_API_KEY")
     reply = None
-    if key:
-        try:
-            with st.spinner("Đang suy nghĩ..."):
-                reply = groq_answer(st.session_state.chat[1:], key)
-        except (urllib.error.URLError, KeyError, ValueError, TimeoutError) as e:
-            detail = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else type(e).__name__
-            st.session_state.ai_error = f"Không gọi được Groq ({detail}), đang dùng trả lời theo quy tắc."
-    st.session_state.chat.append({"role": "assistant", "content": reply or answer(prompt)})
+    if api_key:
+        with st.spinner("Đang trả lời..."):
+            try:
+                reply = ask_groq(api_key, st.session_state.chat)
+            except Exception as exc:  # lỗi mạng, hết quota, khóa sai...
+                reply = f"(Không gọi được AI: {type(exc).__name__}. Trả lời theo quy tắc:)\n\n" + answer(prompt)
+    if not reply:
+        reply = answer(prompt)
+    st.session_state.chat.append({"role": "assistant", "content": reply})
     st.rerun()
-
-if err := st.session_state.pop("ai_error", None):
-    st.warning(err)
-if not _secret("GROQ_API_KEY"):
-    st.caption("Chưa cấu hình GROQ_API_KEY: đang trả lời theo quy tắc mẫu.")
