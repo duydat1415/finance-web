@@ -22,7 +22,7 @@ bundle = get_bundle()
 page_header("Cảnh báo vỡ nợ", "Dự đoán rủi ro vỡ nợ bằng model Random Forest đã huấn luyện")
 st.caption(
     f"Ngưỡng: rủi ro **Cao** từ {HIGH_THRESHOLD:.0%}, **Trung bình** từ {MEDIUM_THRESHOLD:.0%}. "
-    "Đây là công cụ tham khảo, không thay thế thẩm định tín dụng."
+    "Mọi số tiền tính bằng USD, đúng đơn vị dữ liệu huấn luyện. Đây là công cụ tham khảo, không thay thế thẩm định tín dụng."
 )
 
 tab_one, tab_batch = st.tabs(["Một hồ sơ", "Chấm hàng loạt (CSV)"])
@@ -32,8 +32,8 @@ with tab_one:
         with st.form("risk_form"):
             c1, c2, c3 = st.columns(3)
             age = c1.number_input("Tuổi", 18, 100, 35)
-            income = c2.number_input("Thu nhập năm (₫ hoặc đơn vị tương tự)", 0, None, 60000, step=1000)
-            loan_amount = c3.number_input("Số tiền vay", 0, None, 50000, step=1000)
+            income = c2.number_input("Thu nhập năm (USD)", 0, None, 60000, step=1000)
+            loan_amount = c3.number_input("Số tiền vay (USD)", 0, None, 50000, step=1000)
             c4, c5, c6 = st.columns(3)
             credit = c4.number_input("Điểm tín dụng", 300, 850, 650)
             months_emp = c5.number_input("Số tháng làm việc", 0, 600, 36)
@@ -73,7 +73,7 @@ with tab_one:
 
 with tab_batch:
     with st.container(border=True):
-        st.write("Tải file CSV có cùng các cột như dữ liệu huấn luyện (có thể có cột `Default`, sẽ bị bỏ qua).")
+        st.write("Tải file CSV có cùng các cột như dữ liệu huấn luyện, số tiền tính bằng USD (có thể có cột `Default`, sẽ bị bỏ qua).")
         up = st.file_uploader("File CSV hồ sơ vay", type=["csv"])
         if up is not None:
             raw = pd.read_csv(up)
