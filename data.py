@@ -1,9 +1,13 @@
 """Dữ liệu mẫu và các hàm dùng chung cho app tài chính cá nhân."""
 
+from copy import deepcopy
 from datetime import date, timedelta
+from typing import TypeVar
 
 import pandas as pd
 import streamlit as st
+
+AccountData = TypeVar("AccountData")
 
 WALLETS = ["Cash", "MBB", "ACB", "MoMo"]
 CATEGORIES = ["Ăn uống", "Nhà ở", "Di chuyển", "Khác", "Lương", "Chuyển ví"]
@@ -51,6 +55,23 @@ def _active_user_key() -> str:
     if current_user == "An Nhiên" and not matches:
         return DEMO_USER_KEY
     return f"legacy:{current_user}"
+
+
+def is_demo_user() -> bool:
+    return _active_user_key() == DEMO_USER_KEY
+
+
+def get_account_data(
+    section: str,
+    default: AccountData,
+) -> AccountData:
+    """Lấy dữ liệu trong phiên của đúng tài khoản đang đăng nhập."""
+    user_key = _active_user_key()
+    account_data = st.session_state.setdefault("account_data", {})
+    section_data = account_data.setdefault(section, {})
+    if user_key not in section_data:
+        section_data[user_key] = deepcopy(default)
+    return section_data[user_key]
 
 
 def _transactions_by_user() -> dict:

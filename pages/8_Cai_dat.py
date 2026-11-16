@@ -2,19 +2,20 @@
 
 import streamlit as st
 
+from data import get_account_data
+
 
 st.title("Cài đặt")
 
-if "settings" not in st.session_state:
-    st.session_state.settings = {
-        "name": "An Nhiên",
-        "email": "",
-        "currency": "VND",
-        "notify_debt": True,
-        "notify_budget": True,
-        "dark_mode": False,
-    }
-s = st.session_state.settings
+default_settings = {
+    "name": st.session_state.get("current_user", ""),
+    "email": st.session_state.get("current_user_email", ""),
+    "currency": "VND",
+    "notify_debt": True,
+    "notify_budget": True,
+    "dark_mode": False,
+}
+s = get_account_data("settings", default_settings)
 
 with st.form("settings_form"):
     st.subheader("Hồ sơ")
