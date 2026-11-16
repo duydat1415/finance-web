@@ -22,7 +22,8 @@ bundle = get_bundle()
 page_header("Cảnh báo vỡ nợ", "Dự đoán rủi ro vỡ nợ bằng model Random Forest đã huấn luyện")
 st.caption(
     f"Ngưỡng: rủi ro **Cao** từ {HIGH_THRESHOLD:.0%}, **Trung bình** từ {MEDIUM_THRESHOLD:.0%}. "
-    "Mọi số tiền tính bằng USD, đúng đơn vị dữ liệu huấn luyện. Đây là công cụ tham khảo, không thay thế thẩm định tín dụng."
+    "Thu nhập nhập bằng VND và được quy đổi sang USD; các khoản tiền còn lại dùng USD, "
+    "đúng đơn vị dữ liệu huấn luyện. Đây là công cụ tham khảo, không thay thế thẩm định tín dụng."
 )
 
 tab_one, tab_batch = st.tabs(["Một hồ sơ", "Chấm hàng loạt (CSV)"])
@@ -32,7 +33,16 @@ with tab_one:
         with st.form("risk_form"):
             c1, c2, c3 = st.columns(3)
             age = c1.number_input("Tuổi", 18, 100, 35)
-            income = c2.number_input("Thu nhập năm (USD)", 0, None, 60000, step=1000)
+            income_vnd = c2.number_input(
+                "Thu nhập năm (VND)", 0, None, 1_500_000_000, step=10_000_000
+            )
+            usd_vnd_rate = c2.number_input(
+                "Tỷ giá (VND/USD)",
+                min_value=1,
+                value=25_000,
+                step=100,
+                help="Income của mô hình dùng USD. Có thể chỉnh tỷ giá theo thời điểm.",
+            )
             loan_amount = c3.number_input("Số tiền vay (USD)", 0, None, 50000, step=1000)
             c4, c5, c6 = st.columns(3)
             credit = c4.number_input("Điểm tín dụng", 300, 850, 650)
@@ -54,13 +64,18 @@ with tab_one:
             submitted = st.form_submit_button("Chấm rủi ro", type="primary")
 
     if submitted:
+        income_usd = income_vnd / usd_vnd_rate
         row = pd.DataFrame([{
-            "Age": age, "Income": income, "LoanAmount": loan_amount, "CreditScore": credit,
+            "Age": age, "Income": income_usd, "LoanAmount": loan_amount, "CreditScore": credit,
             "MonthsEmployed": months_emp, "NumCreditLines": credit_lines, "InterestRate": rate,
             "LoanTerm": term, "DTIRatio": dti, "Education": education, "EmploymentType": employment,
             "MaritalStatus": marital, "HasMortgage": mortgage, "HasDependents": dependents,
             "HasCoSigner": cosigner, "LoanPurpose": purpose,
         }])
+        st.caption(
+            f"Thu nhập quy đổi: {income_usd:,.2f} USD "
+            f"(tỷ giá {usd_vnd_rate:,.0f} VND/USD)."
+        )
         p = float(predict_default_proba(row, bundle).iloc[0])
         level = risk_level(p)
         st.metric("Xác suất vỡ nợ", f"{p:.1%}")
