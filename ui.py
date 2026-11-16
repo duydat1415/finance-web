@@ -21,8 +21,11 @@ html, body, .stApp, [class*="css"] {font-family: Inter, system-ui, sans-serif;}
 .block-container {padding-top: 2rem; padding-bottom: 3rem; max-width: 1280px;}
 h1 {font-size: 26px !important; font-weight: 700 !important; color: #1F1B24;}
 h2, h3 {color: #1F1B24; font-weight: 700 !important;}
-.page-head {margin-bottom: 8px;}
-.page-head h1 {margin: 0 !important; padding: 0;}
+.page-head {margin-bottom: 8px; overflow: visible;}
+.page-head h1 {
+  display: block; min-height: 1.35em; line-height: 1.35 !important;
+  margin: 0 !important; padding: 0.08em 0 !important; overflow: visible !important;
+}
 .page-head p {margin: 4px 0 0; color: #6B6372; font-size: 14px;}
 
 [data-testid="stSidebar"] {background: #FFFFFF; border-right: 1px solid #ECE8EE;}
