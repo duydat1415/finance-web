@@ -69,10 +69,12 @@ def _register(name: str, email: str, password: str, confirm: str) -> str | None:
 
 
 def _login(email: str, password: str) -> str | None:
-    user = _users().get(email.strip().lower())
+    email_key = email.strip().lower()
+    user = _users().get(email_key)
     if not user or not hmac.compare_digest(user["hash"], _hash_password(password, user["salt"])):
         return "Email hoặc mật khẩu không đúng."
     st.session_state.current_user = user["name"]
+    st.session_state.current_user_email = email_key
     return None
 
 
@@ -88,6 +90,8 @@ with left:
         st.success(f"Đã đăng nhập: {st.session_state.current_user}")
         if st.button("Đăng xuất"):
             del st.session_state["current_user"]
+            st.session_state.pop("current_user_email", None)
+            st.session_state.pop("chat", None)
             st.rerun()
     elif st.session_state.auth_mode == "login":
         st.markdown("## Chào mừng bạn")
@@ -126,6 +130,7 @@ with left:
                     st.error(err)
                 else:
                     st.session_state.current_user = name.strip()
+                    st.session_state.current_user_email = email2.strip().lower()
                     st.rerun()
         if st.button("← Quay lại đăng nhập"):
             st.session_state.auth_mode = "login"

@@ -8,10 +8,23 @@ from data import WALLETS, add_transaction, fmt_vnd, wallet_balances
 st.title("Ví & tài khoản")
 balances = wallet_balances()
 
-cols = st.columns(len(balances))
-for col, (wallet, amount) in zip(cols, balances.items()):
-    with col.container(border=True):
-        st.metric(wallet, fmt_vnd(amount))
+st.markdown(
+    """
+    <style>
+    .st-key-wallet-balances [data-testid="stMetricValue"],
+    .st-key-wallet-balances [data-testid="stMetricValue"] * {
+      font-size: 1.25rem !important;
+      line-height: 1.3 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+with st.container(key="wallet-balances"):
+    cols = st.columns(len(balances))
+    for col, (wallet, amount) in zip(cols, balances.items()):
+        with col.container(border=True):
+            st.metric(wallet, fmt_vnd(amount))
 
 with st.container(border=True):
     st.subheader("Chuyển tiền giữa ví")

@@ -8,6 +8,8 @@ import streamlit as st
 WALLETS = ["Cash", "MBB", "ACB", "MoMo"]
 CATEGORIES = ["Ăn uống", "Nhà ở", "Di chuyển", "Khác", "Lương", "Chuyển ví"]
 TYPES = ["Chi tiêu", "Thu nhập", "Chuyển ví"]
+DEMO_USER_KEY = "demo@example.com"
+TRANSACTION_COLUMNS = ["Ngày", "Giao dịch", "Loại", "Ví", "Số tiền", "Danh mục"]
 
 # Số dư ban đầu của từng ví (VND)
 INITIAL_BALANCES = {"Cash": 2_340_000, "MBB": 18_500_000, "ACB": 10_000_000, "MoMo": 2_000_000}
@@ -26,26 +28,64 @@ def _seed_transactions() -> pd.DataFrame:
         (today - timedelta(days=2), "Tiền nhà tháng 9", "Chi tiêu", "ACB", -2_840_000, "Nhà ở"),
         (today - timedelta(days=3), "Quán cơm", "Chi tiêu", "Cash", -120_000, "Ăn uống"),
     ]
-    df = pd.DataFrame(rows, columns=["Ngày", "Giao dịch", "Loại", "Ví", "Số tiền", "Danh mục"])
+    df = pd.DataFrame(rows, columns=TRANSACTION_COLUMNS)
     return df
 
 
+def _active_user_key() -> str:
+    email = st.session_state.get("current_user_email")
+    if email:
+        return email.strip().lower()
+
+    current_user = st.session_state.get("current_user")
+    users = st.session_state.get("users", {})
+    matches = [
+        email for email, user in users.items()
+        if user.get("name") == current_user
+    ]
+    if len(matches) == 1:
+        st.session_state.current_user_email = matches[0]
+        return matches[0]
+    if not current_user:
+        return DEMO_USER_KEY
+    if current_user == "An Nhiên" and not matches:
+        return DEMO_USER_KEY
+    return f"legacy:{current_user}"
+
+
+def _transactions_by_user() -> dict:
+    if "transactions_by_user" not in st.session_state:
+        transactions = {}
+        legacy_transactions = st.session_state.pop("transactions", None)
+        if legacy_transactions is not None:
+            transactions[DEMO_USER_KEY] = legacy_transactions
+        st.session_state.transactions_by_user = transactions
+    return st.session_state.transactions_by_user
+
+
 def get_transactions() -> pd.DataFrame:
-    """Lấy danh sách giao dịch từ session, khởi tạo lần đầu nếu chưa có."""
-    if "transactions" not in st.session_state:
-        st.session_state.transactions = _seed_transactions()
-    return st.session_state.transactions
+    """Lấy giao dịch riêng của tài khoản hiện tại; chỉ tài khoản demo có dữ liệu mẫu."""
+    user_key = _active_user_key()
+    transactions = _transactions_by_user()
+    if user_key not in transactions:
+        transactions[user_key] = (
+            _seed_transactions()
+            if user_key == DEMO_USER_KEY
+            else pd.DataFrame(columns=TRANSACTION_COLUMNS)
+        )
+    return transactions[user_key]
 
 
 def add_transaction(row: dict) -> None:
     df = get_transactions()
     new = pd.DataFrame([row])
-    st.session_state.transactions = pd.concat([new, df], ignore_index=True)
+    _transactions_by_user()[_active_user_key()] = pd.concat([new, df], ignore_index=True)
 
 
 def wallet_balances() -> dict:
     df = get_transactions()
-    balances = dict(INITIAL_BALANCES)
+    user_key = _active_user_key()
+    balances = dict(INITIAL_BALANCES) if user_key == DEMO_USER_KEY else dict.fromkeys(WALLETS, 0)
     for _, r in df.iterrows():
         balances[r["Ví"]] = balances.get(r["Ví"], 0) + r["Số tiền"]
     return balances

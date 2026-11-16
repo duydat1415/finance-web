@@ -22,6 +22,8 @@ else:
         )
         if st.button("Đăng xuất", use_container_width=True):
             del st.session_state["current_user"]
+            st.session_state.pop("current_user_email", None)
+            st.session_state.pop("chat", None)
             st.rerun()
 
     def page(path: str, title: str, icon: str, **kw) -> st.Page:
