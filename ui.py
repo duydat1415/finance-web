@@ -22,9 +22,9 @@ html, body, .stApp, [class*="css"] {font-family: Inter, system-ui, sans-serif;}
 h1 {font-size: 26px !important; font-weight: 700 !important; color: #1F1B24;}
 h2, h3 {color: #1F1B24; font-weight: 700 !important;}
 .page-head {margin-bottom: 8px; overflow: visible;}
-.page-head h1 {
-  display: block; min-height: 1.35em; line-height: 1.35 !important;
-  margin: 0 !important; padding: 0.08em 0 !important; overflow: visible !important;
+.page-title {
+  display: block; padding: 0.12em 0; overflow: visible;
+  color: #1F1B24; font-size: 26px; font-weight: 700; line-height: 1.5;
 }
 .page-head p {margin: 4px 0 0; color: #6B6372; font-size: 14px;}
 
@@ -91,7 +91,8 @@ def inject_theme(logged_in: bool) -> None:
 def page_header(title: str, subtitle: str = "") -> None:
     sub = f"<p>{html.escape(subtitle)}</p>" if subtitle else ""
     st.markdown(
-        f'<div class="page-head"><h1>{html.escape(title)}</h1>{sub}</div>',
+        f'<div class="page-head"><div class="page-title" role="heading" aria-level="1">'
+        f'{html.escape(title)}</div>{sub}</div>',
         unsafe_allow_html=True,
     )
 
